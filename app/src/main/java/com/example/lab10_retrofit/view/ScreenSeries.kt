@@ -221,3 +221,8 @@ fun ContenidoSerieEliminar(navController: NavHostController, servicio: SerieApiS
     }
 }
 
+@Composable
+fun ScreenInicio() {
+    Text(text = "Bienvenido a SeriesApp")
+}
+
