@@ -26,13 +26,18 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavHostController
 import com.example.lab10_retrofit.data.SerieApiService
 import com.example.lab10_retrofit.data.SerieModel
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 
 class ScreenSeries {
@@ -42,8 +47,16 @@ class ScreenSeries {
 fun ContenidoSeriesListado(navController: NavHostController, servicio: SerieApiService) {
     var listaSeries: SnapshotStateList<SerieModel> = remember { mutableStateListOf() }
     LaunchedEffect(Unit) {
-        val listado = servicio.selectSeries()
-        listado.forEach { listaSeries.add(it) }
+        try {
+            val listado = servicio.selectSeries()
+            Log.d("API", "Series recibidas: ${listado.size}")
+            listado.forEach {
+                Log.d("API", "Serie: ${it.name}")
+                listaSeries.add(it)
+            }
+        } catch (e: Exception) {
+            Log.e("API", "Error al obtener series", e)
+        }
     }
 
     LazyColumn (
@@ -186,40 +199,47 @@ fun ContenidoSerieEditar(navController: NavHostController, servicio: SerieApiSer
 
 @Composable
 fun ContenidoSerieEliminar(navController: NavHostController, servicio: SerieApiService, id: Int) {
-    var showDialog by remember { mutableStateOf(true) }
-    var borrar by remember { mutableStateOf(false) }
+    val showDialog = remember { mutableStateOf(true) }
+    val contexto = LocalContext.current
 
-    if (showDialog) {
+    if (showDialog.value) {
         AlertDialog(
-            onDismissRequest = { showDialog = false },
-            title = { Text(text = "Confirmar Eliminación") },
-            text = {  Text("¿Está seguro de eliminar la Serie?") },
+            onDismissRequest = {
+                showDialog.value = false
+                navController.navigate("series")
+            },
+            title = { Text("Confirmar Eliminación") },
+            text = { Text("¿Está seguro de eliminar la Serie?") },
             confirmButton = {
-                Button(
-                    onClick = {
-                        showDialog = false
-                        borrar = true
-                    } ) {
+                Button(onClick = {
+                    showDialog.value = false
+                    // ✅ Ejecutar eliminación solo cuando se acepta
+                    CoroutineScope(Dispatchers.IO).launch {
+                        try {
+                            servicio.deleteSerie(id.toString())
+                        } catch (e: Exception) {
+                            Log.e("DELETE", "Error eliminando", e)
+                        }
+                        withContext(Dispatchers.Main) {
+                            navController.navigate("series")
+                        }
+                    }
+                }) {
                     Text("Aceptar")
                 }
             },
             dismissButton = {
-                Button( onClick = { showDialog = false } ) {
-                    Text("Cancelar")
+                Button(onClick = {
+                    showDialog.value = false
                     navController.navigate("series")
+                }) {
+                    Text("Cancelar")
                 }
             }
         )
     }
-    if (borrar) {
-        LaunchedEffect(Unit) {
-            // val objSerie = servicio.selectSerie(id.toString())
-            servicio.deleteSerie(id.toString())
-            borrar = false
-            navController.navigate("series")
-        }
-    }
 }
+
 
 @Composable
 fun ScreenInicio() {
